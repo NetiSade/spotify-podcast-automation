@@ -6,4 +6,12 @@
       "schedule": "0 0 * * *"
     }
   ],
+  "env": {
+    "SPOTIFY_CLIENT_ID": "your_client_id",
+    "SPOTIFY_CLIENT_SECRET": "your_client_secret",
+    "SPOTIFY_REFRESH_TOKEN": "your_refresh_token",
+    "SPOTIFY_PLAYLIST_ID": "your_playlist_id",
+    "SPOTIFY_SHOW_IDS": "show_id_1,show_id_2",
+    "CRON_SECRET": "your_cron_secret"
+  }
 }
