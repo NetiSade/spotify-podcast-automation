@@ -15,7 +15,8 @@ async function refreshAccessToken() {
 
 async function getLatestEpisodes(showId) {
   try {
-    const data = await spotifyApi.getShowEpisodes(showId);
+    //get 2 latest episodes
+    const data = await spotifyApi.getShowEpisodes(showId, {limit: 2,});
     return data.body.items;
   } catch (error) {
     console.error(`Error getting episodes for show ${showId}:`, error);
