@@ -1,9 +1,5 @@
 import SpotifyWebApi from "spotify-web-api-node";
 
-//constants
-const NUMBER_OF_EPISODES_TO_CHECK =
-  process.env.NUMBER_OF_EPISODES_TO_CHECK ?? 1;
-
 class SpotifyError extends Error {
   constructor(message, statusCode, spotifyError = null) {
     super(message);
@@ -97,7 +93,7 @@ export default async function handler(req, res) {
         console.log(`Checking show ${showId} for new episodes...`);
         const showData = await handleSpotifyRequest(
           spotifyApi.getShowEpisodes(showId, {
-            limit: NUMBER_OF_EPISODES_TO_CHECK,
+            limit: 1,
           }),
           `get episodes for show ${showId}`
         );
