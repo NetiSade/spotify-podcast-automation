@@ -1,206 +1,137 @@
 import SpotifyWebApi from "spotify-web-api-node";
 
-// Constants
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
-
-/**
- * @typedef {Object} Config
- * @property {string} clientId - Spotify client ID
- * @property {string} clientSecret - Spotify client secret
- * @property {string} refreshToken - Spotify refresh token
- */
-
 class SpotifyError extends Error {
-  constructor(message, statusCode) {
+  constructor(message, statusCode, spotifyError = null) {
     super(message);
     this.name = "SpotifyError";
     this.statusCode = statusCode;
+    this.spotifyError = spotifyError;
   }
 }
 
-// Initialize Spotify API client
-const spotifyApi = new SpotifyWebApi({
-  clientId: process.env.SPOTIFY_CLIENT_ID,
-  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-  refreshToken: process.env.SPOTIFY_REFRESH_TOKEN,
-});
-
-/**
- * Sleep utility function
- * @param {number} ms - Milliseconds to sleep
- */
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Refreshes the Spotify access token
- * @throws {SpotifyError}
- */
-async function refreshAccessToken() {
+async function handleSpotifyRequest(promise, operation) {
   try {
-    const data = await spotifyApi.refreshAccessToken();
-    if (!data.body["access_token"]) {
-      throw new SpotifyError("No access token received", 401);
-    }
-    spotifyApi.setAccessToken(data.body["access_token"]);
+    const response = await promise;
+    return response;
   } catch (error) {
+    console.error(`Error during ${operation}:`, {
+      message: error.message,
+      body: error.body,
+      statusCode: error.statusCode,
+    });
     throw new SpotifyError(
-      `Failed to refresh access token: ${error.message}`,
-      401
+      `Failed to ${operation}`,
+      error.statusCode || 500,
+      error
     );
   }
 }
 
-/**
- * Retries a function with exponential backoff
- * @template T
- * @param {function(): Promise<T>} fn - Function to retry
- * @param {number} [retries=MAX_RETRIES] - Number of retries
- * @returns {Promise<T>}
- */
-async function withRetry(fn, retries = MAX_RETRIES) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (i === retries - 1) throw error;
-      await sleep(RETRY_DELAY * Math.pow(2, i));
-    }
-  }
-}
-
-/**
- * Gets the latest episodes for a show
- * @param {string} showId - Spotify show ID
- * @returns {Promise<Array>}
- */
-async function getLatestEpisodes(showId) {
-  if (!showId?.match(/^[0-9a-zA-Z]{22}$/)) {
-    throw new SpotifyError(`Invalid show ID: ${showId}`, 400);
-  }
-
-  try {
-    const data = await withRetry(() =>
-      spotifyApi.getShowEpisodes(showId, { limit: 1 })
-    );
-    return data.body.items || [];
-  } catch (error) {
-    console.error(`Error getting episodes for show ${showId}:`, {
-      error: error.message,
-      stack: error.stack,
-    });
-    return [];
-  }
-}
-
-/**
- * Gets episodes from a playlist
- * @param {string} playlistId - Spotify playlist ID
- * @returns {Promise<string[]>}
- */
-async function getPlaylistEpisodes(playlistId) {
-  if (!playlistId?.match(/^[0-9a-zA-Z]{22}$/)) {
-    throw new SpotifyError(`Invalid playlist ID: ${playlistId}`, 400);
-  }
-
-  try {
-    const data = await withRetry(() =>
-      spotifyApi.getPlaylistTracks(playlistId)
-    );
-    return data.body.items.map((item) => item.track?.uri).filter(Boolean);
-  } catch (error) {
-    console.error("Error getting playlist episodes:", {
-      error: error.message,
-      stack: error.stack,
-      playlistId,
-    });
-    return [];
-  }
-}
-
-/**
- * Adds an episode to a playlist
- * @param {string} playlistId - Spotify playlist ID
- * @param {string} episodeUri - Spotify episode URI
- */
-async function addEpisodeToPlaylist(playlistId, episodeUri) {
-  if (!episodeUri?.startsWith("spotify:episode:")) {
-    throw new SpotifyError(`Invalid episode URI: ${episodeUri}`, 400);
-  }
-
-  try {
-    await withRetry(() =>
-      spotifyApi.addTracksToPlaylist(playlistId, [episodeUri])
-    );
-    console.log("Successfully added episode to playlist", {
-      episodeUri,
-      playlistId,
-    });
-  } catch (error) {
-    console.error("Error adding episode to playlist:", {
-      error: error.message,
-      stack: error.stack,
-      episodeUri,
-      playlistId,
-    });
-    throw error;
-  }
-}
-
-/**
- * Main handler for the API endpoint
- */
 export default async function handler(req, res) {
   try {
-    // Validate request method
+    // Only allow scheduled POST requests
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    // Verify authorization
-    const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    // Verify the request is from Vercel Cron
+    if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     // Validate environment variables
-    const PLAYLIST_ID = process.env.SPOTIFY_PLAYLIST_ID;
-    const SHOW_IDS = process.env.SPOTIFY_SHOW_IDS?.split(",").filter(Boolean);
-
-    if (!PLAYLIST_ID || !SHOW_IDS?.length) {
-      throw new Error("Missing required environment variables");
+    if (!process.env.SPOTIFY_PLAYLIST_ID || !process.env.SPOTIFY_SHOW_IDS) {
+      throw new Error(
+        "Missing required environment variables: SPOTIFY_PLAYLIST_ID or SPOTIFY_SHOW_IDS"
+      );
     }
 
-    await refreshAccessToken();
+    // Initialize Spotify API client
+    const spotifyApi = new SpotifyWebApi({
+      clientId: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      refreshToken: process.env.SPOTIFY_REFRESH_TOKEN,
+    });
+
+    // Refresh access token
+    console.log("Refreshing access token...");
+    const tokenData = await handleSpotifyRequest(
+      spotifyApi.refreshAccessToken(),
+      "refresh access token"
+    );
+
+    if (!tokenData.body["access_token"]) {
+      throw new Error("No access token received from Spotify");
+    }
+
+    spotifyApi.setAccessToken(tokenData.body["access_token"]);
+    console.log("Access token refreshed successfully");
+
+    // Your configuration
+    const PLAYLIST_ID = process.env.SPOTIFY_PLAYLIST_ID;
+    const SHOW_IDS = process.env.SPOTIFY_SHOW_IDS.split(",").filter(Boolean);
 
     // Get existing episodes in playlist
-    const existingEpisodes = await getPlaylistEpisodes(PLAYLIST_ID);
-
-    // Process each show
-    const results = await Promise.all(
-      SHOW_IDS.map(async (showId) => {
-        try {
-          const latestEpisodes = await getLatestEpisodes(showId);
-
-          for (const episode of latestEpisodes) {
-            if (episode.uri && !existingEpisodes.includes(episode.uri)) {
-              await addEpisodeToPlaylist(PLAYLIST_ID, episode.uri);
-            }
-          }
-          return { showId, success: true };
-        } catch (error) {
-          return { showId, success: false, error: error.message };
-        }
-      })
+    console.log("Getting existing playlist episodes...");
+    const playlistData = await handleSpotifyRequest(
+      spotifyApi.getPlaylistTracks(PLAYLIST_ID),
+      "get playlist tracks"
     );
+
+    const existingEpisodes = playlistData.body.items
+      .filter((item) => item.track && item.track.uri)
+      .map((item) => item.track.uri);
+
+    console.log(`Found ${existingEpisodes.length} existing episodes`);
+
+    // Check each show for new episodes
+    let newEpisodesAdded = 0;
+    const results = [];
+
+    for (const showId of SHOW_IDS) {
+      try {
+        console.log(`Checking show ${showId} for new episodes...`);
+        const showData = await handleSpotifyRequest(
+          spotifyApi.getShowEpisodes(showId, { limit: 2 }),
+          `get episodes for show ${showId}`
+        );
+
+        const latestEpisodes = showData.body.items;
+
+        for (const episode of latestEpisodes) {
+          if (episode.uri && !existingEpisodes.includes(episode.uri)) {
+            console.log(`Adding new episode: ${episode.name} (${episode.uri})`);
+            await handleSpotifyRequest(
+              spotifyApi.addTracksToPlaylist(PLAYLIST_ID, [episode.uri]),
+              `add episode ${episode.uri} to playlist`
+            );
+            newEpisodesAdded++;
+          }
+        }
+
+        results.push({ showId, success: true });
+      } catch (error) {
+        console.error(`Failed to process show ${showId}:`, error);
+        results.push({
+          showId,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,
+      newEpisodesAdded,
       results,
+      message: `Successfully checked for new episodes. Added ${newEpisodesAdded} new episodes.`,
     });
   } catch (error) {
     console.error("Error in podcast checker:", {
-      error: error.message,
+      message: error.message,
+      name: error.name,
+      statusCode: error.statusCode,
+      spotifyError: error.spotifyError,
       stack: error.stack,
     });
 
@@ -208,6 +139,7 @@ export default async function handler(req, res) {
     return res.status(statusCode).json({
       error: error.message,
       type: error.name,
+      details: error.spotifyError,
     });
   }
 }
