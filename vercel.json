@@ -13,6 +13,6 @@
     "SPOTIFY_PLAYLIST_ID": "your_playlist_id",
     "SPOTIFY_SHOW_IDS": "show_id_1,show_id_2",
     "CRON_SECRET": "your_cron_secret",
-    "NUMBER_OF_EPISODES_TO_CHECK": 1
+    "NUMBER_OF_EPISODES_TO_CHECK": '1'
   }
 }
