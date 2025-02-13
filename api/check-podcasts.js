@@ -29,7 +29,7 @@ async function handleSpotifyRequest(promise, operation) {
 
 export default async function handler(req, res) {
   try {
-    // Only allow scheduled GET requests
+    // Only allow scheduled POST requests
     if (req.method !== "GET") {
       return res.status(405).json({ error: "Method not allowed" });
     }
@@ -40,9 +40,9 @@ export default async function handler(req, res) {
     }
 
     // Validate environment variables
-    if (!process.env.SPOTIFY_PLAYLIST_ID || !process.env.SPOTIFY_SHOW_IDS) {
+    if (!process.env.SPOTIFY_PLAYLIST_ID) {
       throw new Error(
-        "Missing required environment variables: SPOTIFY_PLAYLIST_ID or SPOTIFY_SHOW_IDS"
+        "Missing required environment variable: SPOTIFY_PLAYLIST_ID"
       );
     }
 
@@ -75,7 +75,34 @@ export default async function handler(req, res) {
 
     // Your configuration
     const PLAYLIST_ID = process.env.SPOTIFY_PLAYLIST_ID;
-    const SHOW_IDS = process.env.SPOTIFY_SHOW_IDS.split(",").filter(Boolean);
+
+    const GENERAL_SHOW_URLS = [
+      {
+        name: "How To Do Things",
+        url: "https://open.spotify.com/show/3JVB81Ce5eXH8dgVKe6A57?si=abc123",
+      },
+      {
+        name: "היידה",
+        url: "https://open.spotify.com/show/0VeR5mYtFCTfSCa7SCVH83?si=def456",
+      },
+      {
+        name: "וויקליסינק",
+        url: "https://open.spotify.com/show/674Fd3udoDREXmBq44dHWY?si=dc3279b7d877434b",
+      },
+      {
+        name: "OnePlusOne",
+        url: "https://open.spotify.com/show/1jMmrLogjWyQEYPDHf5INh?si=xyz789",
+      },
+      {
+        name: "הקרנף",
+        url: "https://open.spotify.com/show/6bcWODxao3AI48YzWpF6g5?si=1234567890",
+      },
+    ];
+
+    // Extract show IDs from URLs, removing any query parameters
+    const showIds = GENERAL_SHOW_URLS.map(
+      (show) => show.url.split("/show/")[1].split("?")[0]
+    );
 
     // Get existing episodes in playlist
     console.log("Getting existing playlist episodes...");
@@ -94,30 +121,52 @@ export default async function handler(req, res) {
     let newEpisodesAdded = 0;
     const results = [];
 
-    for (const showId of SHOW_IDS) {
+    // Handle general shows first
+    for (const showId of showIds) {
       try {
-        console.log(`Checking show ${showId} for new episodes...`);
+        const showInfo = GENERAL_SHOW_URLS.find((show) =>
+          show.url.includes(showId)
+        );
+        console.log(
+          `Checking show "${showInfo.name}" (${showId}) for new episodes...`
+        );
         const showData = await handleSpotifyRequest(
           spotifyApi.getShowEpisodes(showId, {
             limit: 1,
           }),
-          `get episodes for show ${showId}`
+          `get episodes for show "${showInfo.name}"`
         );
+
+        if (!showData.body.items || !showData.body.items.length) {
+          console.log(`No episodes found for show "${showInfo.name}"`);
+          continue;
+        }
 
         const latestEpisodes = showData.body.items;
 
         for (const episode of latestEpisodes) {
-          if (episode.uri && !existingEpisodes.includes(episode.uri)) {
-            console.log(`Adding new episode: ${episode.name} (${episode.uri})`);
+          if (!episode || !episode.uri) {
+            console.log(`Invalid episode data for show "${showInfo.name}"`);
+            continue;
+          }
+
+          if (!existingEpisodes.includes(episode.uri)) {
+            console.log(
+              `Adding new episode: "${episode.name}" from "${showInfo.name}" (${episode.uri})`
+            );
             await handleSpotifyRequest(
               spotifyApi.addTracksToPlaylist(PLAYLIST_ID, [episode.uri]),
-              `add episode ${episode.uri} to playlist`
+              `add episode "${episode.name}" from "${showInfo.name}" to playlist`
             );
             newEpisodesAdded++;
           }
         }
 
-        results.push({ showId, success: true });
+        console.log(
+          `Found ${latestEpisodes.length} episodes for show "${showInfo.name}"`
+        );
+
+        results.push({ showId, showName: showInfo.name, success: true });
       } catch (error) {
         console.error("Error in podcast checker:", {
           message: error.message,
