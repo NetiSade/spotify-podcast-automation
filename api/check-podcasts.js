@@ -1,5 +1,31 @@
 import SpotifyWebApi from "spotify-web-api-node";
 
+// const
+const GENERAL_SHOW_URLS = [
+  {
+    name: "How To Do Things",
+    url: "https://open.spotify.com/show/3JVB81Ce5eXH8dgVKe6A57?si=abc123",
+  },
+  {
+    name: "היידה",
+    url: "https://open.spotify.com/show/0VeR5mYtFCTfSCa7SCVH83?si=def456",
+  },
+  {
+    name: "וויקליסינק",
+    url: "https://open.spotify.com/show/674Fd3udoDREXmBq44dHWY?si=dc3279b7d877434b",
+  },
+  {
+    name: "OnePlusOne",
+    url: "https://open.spotify.com/show/1jMmrLogjWyQEYPDHf5INh?si=xyz789",
+  },
+  {
+    name: "הקרנף",
+    url: "https://open.spotify.com/show/6bcWODxao3AI48YzWpF6g5?si=1234567890",
+  },
+];
+
+const NEW_SHOWS_LIMIT = 2;
+
 class SpotifyError extends Error {
   constructor(message, statusCode, spotifyError = null) {
     super(message);
@@ -76,29 +102,6 @@ export default async function handler(req, res) {
     // Your configuration
     const PLAYLIST_ID = process.env.SPOTIFY_PLAYLIST_ID;
 
-    const GENERAL_SHOW_URLS = [
-      {
-        name: "How To Do Things",
-        url: "https://open.spotify.com/show/3JVB81Ce5eXH8dgVKe6A57?si=abc123",
-      },
-      {
-        name: "היידה",
-        url: "https://open.spotify.com/show/0VeR5mYtFCTfSCa7SCVH83?si=def456",
-      },
-      {
-        name: "וויקליסינק",
-        url: "https://open.spotify.com/show/674Fd3udoDREXmBq44dHWY?si=dc3279b7d877434b",
-      },
-      {
-        name: "OnePlusOne",
-        url: "https://open.spotify.com/show/1jMmrLogjWyQEYPDHf5INh?si=xyz789",
-      },
-      {
-        name: "הקרנף",
-        url: "https://open.spotify.com/show/6bcWODxao3AI48YzWpF6g5?si=1234567890",
-      },
-    ];
-
     // Extract show IDs from URLs, removing any query parameters
     const showIds = GENERAL_SHOW_URLS.map(
       (show) => show.url.split("/show/")[1].split("?")[0]
@@ -132,7 +135,7 @@ export default async function handler(req, res) {
         );
         const showData = await handleSpotifyRequest(
           spotifyApi.getShowEpisodes(showId, {
-            limit: 1,
+            limit: NEW_SHOWS_LIMIT,
           }),
           `get episodes for show "${showInfo.name}"`
         );
@@ -145,11 +148,9 @@ export default async function handler(req, res) {
         const latestEpisodes = showData.body.items;
 
         for (const episode of latestEpisodes) {
-          if (!episode || !episode.uri) {
-            console.log(`Invalid episode data for show "${showInfo.name}"`);
+          if (!episode || !episode.uri || !episode.name) {
             continue;
           }
-
           if (!existingEpisodes.includes(episode.uri)) {
             console.log(
               `Adding new episode: "${episode.name}" from "${showInfo.name}" (${episode.uri})`
@@ -161,10 +162,6 @@ export default async function handler(req, res) {
             newEpisodesAdded++;
           }
         }
-
-        console.log(
-          `Found ${latestEpisodes.length} episodes for show "${showInfo.name}"`
-        );
 
         results.push({ showId, showName: showInfo.name, success: true });
       } catch (error) {
