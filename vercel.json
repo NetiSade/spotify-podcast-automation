@@ -5,5 +5,5 @@
       "path": "/api/check-podcasts",
       "schedule": "0 0 * * *"
     }
-  ],
+  ]
 }
