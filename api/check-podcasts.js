@@ -29,7 +29,7 @@ async function handleSpotifyRequest(promise, operation) {
 
 export default async function handler(req, res) {
   try {
-    // Only allow scheduled POST requests
+    // Only allow scheduled GET requests
     if (req.method !== "GET") {
       return res.status(405).json({ error: "Method not allowed" });
     }
