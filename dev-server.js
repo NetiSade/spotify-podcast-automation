@@ -12,7 +12,7 @@ const PORT = 3000;
 app.use(express.json());
 
 // Create a test endpoint
-app.post("/api/check-podcasts", async (req, res) => {
+app.get("/api/check-podcasts", async (req, res) => {
   // Add the cron secret to the headers to simulate Vercel cron
   req.headers.authorization = `Bearer ${process.env.CRON_SECRET}`;
 
