@@ -45,6 +45,5 @@ app.listen(PORT, () => {
     "- SPOTIFY_PLAYLIST_ID exists:",
     !!process.env.SPOTIFY_PLAYLIST_ID
   );
-  console.log("- SPOTIFY_SHOW_IDS exists:", !!process.env.SPOTIFY_SHOW_IDS);
   console.log("- CRON_SECRET exists:", !!process.env.CRON_SECRET);
 });
