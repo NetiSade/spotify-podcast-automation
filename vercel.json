@@ -3,8 +3,7 @@
   "crons": [
     {
       "path": "/api/check-podcasts",
-      "schedule": "0 0 * * *",
-      "httpMethod": "GET"
+      "schedule": "0 0 * * *"
     }
   ],
   "env": {
