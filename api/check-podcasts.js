@@ -53,6 +53,12 @@ export default async function handler(req, res) {
       refreshToken: process.env.SPOTIFY_REFRESH_TOKEN,
     });
 
+    console.log("Spotify API Configuration:", {
+      clientIdLength: process.env.SPOTIFY_CLIENT_ID?.length || 0,
+      clientSecretLength: process.env.SPOTIFY_CLIENT_SECRET?.length || 0,
+      refreshTokenLength: process.env.SPOTIFY_REFRESH_TOKEN?.length || 0,
+    });
+
     // Refresh access token
     console.log("Refreshing access token...");
     const tokenData = await handleSpotifyRequest(
@@ -113,11 +119,25 @@ export default async function handler(req, res) {
 
         results.push({ showId, success: true });
       } catch (error) {
-        console.error(`Failed to process show ${showId}:`, error);
-        results.push({
-          showId,
-          success: false,
+        console.error("Error in podcast checker:", {
+          message: error.message,
+          name: error.name,
+          statusCode: error.statusCode,
+          spotifyError: error.spotifyError,
+          stack: error.stack,
+          envCheck: {
+            hasClientId: !!process.env.SPOTIFY_CLIENT_ID,
+            hasClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
+            hasRefreshToken: !!process.env.SPOTIFY_REFRESH_TOKEN,
+          },
+        });
+
+        const statusCode =
+          error instanceof SpotifyError ? error.statusCode : 500;
+        return res.status(statusCode).json({
           error: error.message,
+          type: error.name,
+          details: error.spotifyError,
         });
       }
     }
