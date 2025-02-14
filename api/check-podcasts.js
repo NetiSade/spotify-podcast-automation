@@ -1,11 +1,16 @@
 import SpotifyWebApi from "spotify-web-api-node";
 import { handleSpotifyRequest } from "./utils.js";
-import { MY_SHOWS, NEW_SHOWS_LIMIT, OLD_EPISODES_DAYS } from "./consts.js";
+import {
+  MY_SHOWS,
+  NEW_SHOWS_LIMIT,
+  OLD_EPISODES_DAYS,
+  MAX_EPISODES_PER_SHOW,
+} from "./consts.js";
 import { SpotifyError } from "./types.js";
 
 //TODO:
-// - clean up the playlist from old episodes
-// - clean up the playlist from more then x episodes per show
+// - clean up the playlist from old episodes (done)
+// - clean up the playlist from more then x episodes per show (done)
 
 export default async function handler(req, res) {
   try {
@@ -56,11 +61,6 @@ export default async function handler(req, res) {
     spotifyApi.setAccessToken(tokenData.body["access_token"]);
     console.log("Access token refreshed successfully");
 
-    // Extract show IDs from URLs, removing any query parameters
-    const showIds = MY_SHOWS.map(
-      (show) => show.url.split("/show/")[1].split("?")[0]
-    );
-
     // Get existing episodes in playlist
     console.log("Getting existing playlist episodes...");
     const playlistData = await handleSpotifyRequest(
@@ -73,6 +73,7 @@ export default async function handler(req, res) {
       .map((item) => ({
         uri: item.track.uri,
         addedAt: new Date(item.added_at),
+        showId: item.track.artists[0].uri.split("show:")[1],
       }));
 
     console.log(`Found ${existingEpisodes.length} existing episodes`);
@@ -94,7 +95,10 @@ export default async function handler(req, res) {
     }
 
     // Clean up playlist from old episodes
-    await handlePlaylistCleanup(PLAYLIST_ID, existingEpisodes, spotifyApi);
+    await cleanupOldEpisodes(PLAYLIST_ID, existingEpisodes, spotifyApi);
+
+    // Clean up playlist from more then x episodes per show
+    await cleanupMaxEpisodes(PLAYLIST_ID, existingEpisodes, spotifyApi);
 
     return res.status(200).json({
       success: true,
@@ -198,11 +202,7 @@ const handleShowEpisodes = async (
   }
 };
 
-const handlePlaylistCleanup = async (
-  playlistId,
-  existingEpisodes,
-  spotifyApi
-) => {
+const cleanupOldEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
   try {
     console.log("Cleaning up playlist from old episodes...");
 
@@ -228,6 +228,49 @@ const handlePlaylistCleanup = async (
     );
 
     console.log("Playlist cleaned up successfully");
+  } catch (error) {
+    console.error("Error in playlist cleanup:", {
+      message: error.message,
+      name: error.name,
+      statusCode: error.statusCode,
+    });
+  }
+};
+
+const cleanupMaxEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
+  try {
+    console.log("Cleaning up playlist from more than x episodes per show...");
+
+    const episodesPerShow = existingEpisodes.reduce((acc, episode) => {
+      const showId = episode.showId;
+      if (!acc[showId]) {
+        acc[showId] = 0;
+      }
+      acc[showId]++;
+      return acc;
+    }, {});
+
+    const showsWithTooManyEpisodes = Object.entries(episodesPerShow).filter(
+      ([, count]) => count > MAX_EPISODES_PER_SHOW
+    );
+
+    for (const [showId, count] of showsWithTooManyEpisodes) {
+      console.log(`Show "${showId}" has ${count} episodes`);
+      const episodesToRemove = count - MAX_EPISODES_PER_SHOW;
+      // remove the oldest episodes
+      const episodesToRemoveUris = existingEpisodes
+        .filter((ep) => ep.showId === showId)
+        .sort((a, b) => a.addedAt - b.addedAt)
+        .slice(0, episodesToRemove)
+        .map((ep) => ({ uri: ep.uri }));
+
+      await handleSpotifyRequest(
+        spotifyApi.removeTracksFromPlaylist(playlistId, episodesToRemoveUris),
+        `remove ${episodesToRemove} episodes from show "${showId}"`
+      );
+
+      console.log(`Removed ${episodesToRemove} episodes from show "${showId}"`);
+    }
   } catch (error) {
     console.error("Error in playlist cleanup:", {
       message: error.message,
