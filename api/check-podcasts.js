@@ -239,7 +239,7 @@ const cleanupOldEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
 
 const cleanupMaxEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
   try {
-    console.log("Cleaning up playlist from more than x episodes per show...");
+    console.log(`Cleaning up playlist from more than ${MAX_EPISODES_PER_SHOW} episodes per show...`);
 
     const episodesPerShow = existingEpisodes.reduce((acc, episode) => {
       const showId = episode.showId;
