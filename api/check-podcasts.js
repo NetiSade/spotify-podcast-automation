@@ -250,9 +250,13 @@ const cleanupMaxEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
       return acc;
     }, {});
 
+    console.log('Episodes per show map:', episodesPerShow);
+
     const showsWithTooManyEpisodes = Object.entries(episodesPerShow).filter(
       ([, count]) => count > MAX_EPISODES_PER_SHOW
     );
+
+    console.log('Shows with too many episodes', showsWithTooManyEpisodes);
 
     for (const [showId, count] of showsWithTooManyEpisodes) {
       console.log(`Show "${showId}" has ${count} episodes`);
