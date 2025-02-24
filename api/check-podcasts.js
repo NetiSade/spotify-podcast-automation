@@ -295,13 +295,13 @@ const cleanupCompleatedEpisodes = async (playlistId, existingEpisodes, spotifyAp
 
     console.log('cleanupCompleatedEpisodes - getEpisodes response',episodesData);
 
-    if (!episodesData.episodes) {
+    if (!episodesData.body.episodes) {
       throw new Error(
         "episodesData is undefiend"
       );
     }
 
-    const completedEpisodesUri = episodesData.episodes.filter(item =>
+    const completedEpisodesUri = episodesData.body.episodes.filter(item =>
       item.episode.resume_point?.fully_played === true
     ).map(e => e.uri);
 
