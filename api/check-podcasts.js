@@ -71,6 +71,7 @@ export default async function handler(req, res) {
     const existingEpisodes = playlistData.body.items
       .filter((item) => item.track && item.track.uri)
       .map((item) => ({
+        id: item.track.id,
         uri: item.track.uri,
         addedAt: new Date(item.added_at),
         showId: item.track.artists[0].uri.split("show:")[1],
@@ -99,6 +100,8 @@ export default async function handler(req, res) {
 
     // Clean up playlist from more then x episodes per show
     await cleanupMaxEpisodes(PLAYLIST_ID, existingEpisodes, spotifyApi);
+
+    await cleanupCompleatedEpisodes(PLAYLIST_ID, existingEpisodes, spotifyApi);
 
     return res.status(200).json({
       success: true,
@@ -283,3 +286,35 @@ const cleanupMaxEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
     });
   }
 };
+
+const cleanupCompleatedEpisodes = async (playlistId, existingEpisodes, spotifyApi) => {
+  try {
+    const episodesIds = existingEpisodes.map(e => e.id);
+
+    const episodesData = await handleSpotifyRequest(spotifyApi.getEpisodes(episodesIds), `get episodes data of ${episodesIds}`);
+
+    if (!episodesData.episodes) {
+      throw new Error(
+        "episodesData is undefiend"
+      );
+    }
+
+    const completedEpisodesUri = episodesData.episodes.filter(item =>
+      item.episode.resume_point?.fully_played === true
+    ).map(e => e.uri);
+
+
+    await handleSpotifyRequest(
+      spotifyApi.removeTracksFromPlaylist(playlistId, completedEpisodesUri),
+      `remove ${completedEpisodesUri} episodes from playlist`
+    );
+
+
+  } catch (error) {
+    console.error("Error in cleanupCompleatedEpisodes:", {
+      message: error.message,
+      name: error.name,
+      statusCode: error.statusCode,
+    });
+  }
+}
