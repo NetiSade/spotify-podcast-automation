@@ -292,52 +292,38 @@ const cleanupCompleatedEpisodes = async (playlistId, existingEpisodes, spotifyAp
   try {
     const episodesIds = existingEpisodes.map(e => e.id);
 
-    const episodesData = await handleSpotifyRequest(
-      spotifyApi.getEpisodes(episodesIds), 
-      `get episodes data of ${episodesIds}`
-    );
+    const episodesData = await handleSpotifyRequest(spotifyApi.getEpisodes(episodesIds), `get episodes data of ${episodesIds}`);
 
     if (!episodesData.body.episodes) {
-      throw new Error("episodesData is undefined");
+      throw new Error(
+        "episodesData is undefiend"
+      );
     }
 
-    const FIVE_MINUTES_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const completedEpisodesUri = episodesData.body.episodes.filter(item =>
+      item.resume_point?.fully_played === true
+    ).map(e => ({ uri: e.uri }));
 
-    const nearlyCompletedEpisodesUri = episodesData.body.episodes
-      .filter(episode => {
-        // Skip if episode is null or has no resume point
-        if (!episode || !episode.resume_point) return false;
-        
-        const timeRemaining = episode.duration_ms - (episode.resume_point.resume_position_ms || 0);
-        return timeRemaining > 0 && timeRemaining < FIVE_MINUTES_MS;
-      })
-      .map(episode => {
-        const timeRemaining = Math.round((episode.duration_ms - episode.resume_point.resume_position_ms) / 1000 / 60);
-        console.log(`Episode "${episode.name}" has ${timeRemaining} minutes remaining`);
-        return { uri: episode.uri };
-      });
 
-    if (!nearlyCompletedEpisodesUri.length) {
-      console.log('There are no episodes with less than 5 minutes remaining to cleanup');
+    if (completedEpisodesUri) {
+      console.log('cleanupCompleatedEpisodes - there is no compleated episodes to cleanup');
       return;
     }
 
-    console.log(`Starting to remove ${nearlyCompletedEpisodesUri.length} nearly completed episodes from playlist`, 
-      nearlyCompletedEpisodesUri);
+    console.log(`cleanupCompleatedEpisodes - start remve ${completedEpisodesUri.length} episodes from playlist`, completedEpisodesUri);
 
     await handleSpotifyRequest(
-      spotifyApi.removeTracksFromPlaylist(playlistId, nearlyCompletedEpisodesUri),
-      `remove ${nearlyCompletedEpisodesUri.length} episodes from playlist`
+      spotifyApi.removeTracksFromPlaylist(playlistId, completedEpisodesUri),
+      `remove ${completedEpisodesUri} episodes from playlist`
     );
 
-    console.log(`Successfully removed ${nearlyCompletedEpisodesUri.length} nearly completed episodes from playlist`);
+    console.log(`Removed ${completedEpisodesUri.length} episodes from playlist`);
 
   } catch (error) {
-    console.error("Error in cleanupNearlyCompletedEpisodes:", {
+    console.error("Error in cleanupCompleatedEpisodes:", {
       message: error.message,
       name: error.name,
       statusCode: error.statusCode,
     });
-    throw error;
   }
 }
