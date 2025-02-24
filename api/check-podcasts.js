@@ -303,7 +303,7 @@ const cleanupCompleatedEpisodes = async (playlistId, existingEpisodes, spotifyAp
 
     const completedEpisodesUri = episodesData.body.episodes.filter(item =>
       item.resume_point?.fully_played === true
-    ).map(e => e.uri);
+    ).map(e => { uri: e.uri });
 
 
     await handleSpotifyRequest(
