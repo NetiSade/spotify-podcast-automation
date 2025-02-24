@@ -293,7 +293,7 @@ const cleanupCompleatedEpisodes = async (playlistId, existingEpisodes, spotifyAp
 
     const episodesData = await handleSpotifyRequest(spotifyApi.getEpisodes(episodesIds), `get episodes data of ${episodesIds}`);
 
-    console.log('cleanupCompleatedEpisodes - getEpisodes response',episodesData);
+    console.log('cleanupCompleatedEpisodes - getEpisodes response', JSON.stringify(episodesData));
 
     if (!episodesData.body.episodes) {
       throw new Error(
