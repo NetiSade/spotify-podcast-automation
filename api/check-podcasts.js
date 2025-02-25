@@ -305,7 +305,7 @@ const cleanupCompleatedEpisodes = async (playlistId, existingEpisodes, spotifyAp
     ).map(e => ({ uri: e.uri }));
 
 
-    if (completedEpisodesUri) {
+    if (completedEpisodesUri.length === 0) {
       console.log('cleanupCompleatedEpisodes - there is no compleated episodes to cleanup');
       return;
     }
