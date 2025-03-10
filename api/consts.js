@@ -1,5 +1,5 @@
 export const MAX_EPISODES_PER_SHOW = 3;
-export const OLD_EPISODES_DAYS = 7;
+export const OLD_EPISODES_DAYS = 3;
 export const NEW_SHOWS_LIMIT = 1;
 
 export const MY_SHOWS = [
