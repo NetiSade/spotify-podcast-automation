@@ -23,4 +23,8 @@ export const MY_SHOWS = [
     name: "הקרנף",
     url: "https://open.spotify.com/show/6bcWODxao3AI48YzWpF6g5?si=1234567890",
   },
+  {
+    name: "Ignore the instructions",
+    url:"https://open.spotify.com/show/3TcLj7yJyozvLyYxPCjePH?si=2qcR01UcQGa30EoImOWU6A"
+  }
 ];
